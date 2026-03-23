@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPARC™ Voice Agent — Test Console</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0f;
+            color: #c0c0c0;
+            min-height: 100vh;
+            padding: 24px;
+        }
+        h1 {
+            color: #00ffaa;
+            font-size: 18px;
+            margin-bottom: 4px;
+            letter-spacing: 2px;
+        }
+        .subtitle {
+            color: #555;
+            font-size: 12px;
+            margin-bottom: 24px;
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 12px 16px;
+            background: #111118;
+            border: 1px solid #222;
+            border-radius: 6px;
+        }
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #333;
+            transition: background 0.3s;
+        }
+        .status-dot.connected { background: #00ffaa; box-shadow: 0 0 8px #00ffaa44; }
+        .status-dot.speaking { background: #ffaa00; box-shadow: 0 0 8px #ffaa0044; animation: pulse 1s infinite; }
+        .status-dot.error { background: #ff4444; }
+        .status-text { font-size: 13px; color: #888; }
+        .persona-label { margin-left: auto; color: #00ffaa; font-size: 13px; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section-label {
+            font-size: 11px;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .persona-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .persona-btn {
+            padding: 12px 8px;
+            background: #111118;
+            border: 1px solid #222;
+            border-radius: 6px;
+            color: #888;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .persona-btn:hover { border-color: #00ffaa44; color: #c0c0c0; }
+        .persona-btn.active {
+            border-color: #00ffaa;
+            color: #00ffaa;
+            background: #00ffaa08;
+        }
+        .persona-btn .name { font-weight: bold; display: block; margin-bottom: 4px; font-size: 13px; }
+        .persona-btn .route { font-size: 10px; color: #555; }
+
+        .call-btn {
+            width: 100%;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            border: 2px solid #00ffaa;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 24px;
+            background: #00ffaa10;
+            color: #00ffaa;
+        }
+        .call-btn:hover { background: #00ffaa20; }
+        .call-btn.active {
+            background: #ff444420;
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        .call-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .transcript {
+            background: #111118;
+            border: 1px solid #222;
+            border-radius: 6px;
+            padding: 16px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+        .transcript-line {
+            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .transcript-line .role {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        .transcript-line .role.user { color: #6688ff; }
+        .transcript-line .role.assistant { color: #00ffaa; }
+        .transcript-line .role.system { color: #555; }
+        .transcript-line .text { color: #c0c0c0; }
+        .transcript-line.system .text { color: #555; font-style: italic; }
+
+        .config-section {
+            background: #111118;
+            border: 1px solid #222;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .config-row label {
+            font-size: 12px;
+            color: #555;
+            width: 100px;
+            flex-shrink: 0;
+        }
+        .config-row input {
+            flex: 1;
+            padding: 8px 10px;
+            background: #0a0a0f;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: #c0c0c0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .config-row input:focus { border-color: #00ffaa44; outline: none; }
+        .save-btn {
+            padding: 6px 16px;
+            background: none;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #888;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .save-btn:hover { border-color: #00ffaa; color: #00ffaa; }
+    </style>
+</head>
+<body>
+    <h1>SPARC™ TEST CONSOLE</h1>
+    <p class="subtitle">Signal Processing & Response Core — Voice Agent Test Interface</p>
+
+    <!-- Config -->
+    <div class="section-label">Configuration</div>
+    <div class="config-section">
+        <div class="config-row">
+            <label>Public Key</label>
+            <input type="text" id="vapiKey" placeholder="Your Vapi Public Key" />
+        </div>
+        <div class="config-row">
+            <label>Assistant ID</label>
+            <input type="text" id="assistantId" placeholder="Your Vapi Assistant ID" />
+        </div>
+        <div class="config-row">
+            <label></label>
+            <button class="save-btn" onclick="saveConfig()">Save to LocalStorage</button>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-text" id="statusText">Idle — select a persona and start call</span>
+        <span class="persona-label" id="personaLabel"></span>
+    </div>
+
+    <!-- Persona Selection -->
+    <div class="section-label">Select Page Context</div>
+    <div class="persona-grid">
+        <button class="persona-btn active" data-route="/about" data-persona="connector" onclick="selectPersona(this)">
+            <span class="name">Connector</span>
+            <span class="route">About / Default</span>
+        </button>
+        <button class="persona-btn" data-route="/services/strategy-intelligence" data-persona="analyst" onclick="selectPersona(this)">
+            <span class="name">Analyst</span>
+            <span class="route">Strategy & Intelligence</span>
+        </button>
+        <button class="persona-btn" data-route="/services/visibility-authority" data-persona="navigator" onclick="selectPersona(this)">
+            <span class="name">Navigator</span>
+            <span class="route">Visibility & Authority</span>
+        </button>
+        <button class="persona-btn" data-route="/services/acquisition-conversion" data-persona="accelerator" onclick="selectPersona(this)">
+            <span class="name">Accelerator</span>
+            <span class="route">Acquisition & Conversion</span>
+        </button>
+        <button class="persona-btn" data-route="/services/experience-infrastructure" data-persona="engineer" onclick="selectPersona(this)">
+            <span class="name">Engineer</span>
+            <span class="route">Experience & Infrastructure</span>
+        </button>
+        <button class="persona-btn" data-route="/services/retention-growth" data-persona="multiplier" onclick="selectPersona(this)">
+            <span class="name">Multiplier</span>
+            <span class="route">Retention & Growth</span>
+        </button>
+    </div>
+
+    <!-- Call Button -->
+    <button class="call-btn" id="callBtn" onclick="toggleCall()">
+        START CALL
+    </button>
+
+    <!-- Transcript -->
+    <div class="section-label">Live Transcript</div>
+    <div class="transcript" id="transcript">
+        <div class="transcript-line system">
+            <span class="role system">system</span>
+            <span class="text">Ready. Select a persona and click START CALL.</span>
+        </div>
+    </div>
+
+    <!-- Vapi Web SDK (UMD browser bundle) -->
+    <script src="https://cdn.jsdelivr.net/gh/VapiAI/html-script-tag@latest/dist/assets/index.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/gh/balacodeio/Vapi-Web-UMD@latest/dist/latest/vapi-web-bundle.min.js"></script>
+    <script>
+        let vapi = null;
+        let isCallActive = false;
+        let currentRoute = "/about";
+        let currentPersona = "connector";
+
+        // Load config from server .env on page load
+        window.addEventListener("DOMContentLoaded", async () => {
+            try {
+                const resp = await fetch("/api/config");
+                const config = await resp.json();
+                if (config.vapiPublicKey) {
+                    document.getElementById("vapiKey").value = config.vapiPublicKey;
+                }
+                if (config.assistantId) {
+                    document.getElementById("assistantId").value = config.assistantId;
+                }
+                addTranscriptLine("system", "Config loaded from server.");
+            } catch (e) {
+                // Fall back to localStorage
+                const savedKey = localStorage.getItem("sparc_vapi_key") || "";
+                const savedAssistant = localStorage.getItem("sparc_assistant_id") || "";
+                document.getElementById("vapiKey").value = savedKey;
+                document.getElementById("assistantId").value = savedAssistant;
+            }
+        });
+
+        function saveConfig() {
+            localStorage.setItem("sparc_vapi_key", document.getElementById("vapiKey").value.trim());
+            localStorage.setItem("sparc_assistant_id", document.getElementById("assistantId").value.trim());
+            addTranscriptLine("system", "Config saved to localStorage.");
+        }
+
+        function selectPersona(btn) {
+            document.querySelectorAll(".persona-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            currentRoute = btn.dataset.route;
+            currentPersona = btn.dataset.persona;
+            document.getElementById("personaLabel").textContent = currentPersona.toUpperCase();
+            addTranscriptLine("system", `Persona set to ${currentPersona} (${currentRoute})`);
+        }
+
+        function setStatus(state, text) {
+            const dot = document.getElementById("statusDot");
+            const label = document.getElementById("statusText");
+            dot.className = "status-dot " + state;
+            label.textContent = text;
+        }
+
+        function addTranscriptLine(role, text) {
+            const container = document.getElementById("transcript");
+            const line = document.createElement("div");
+            line.className = "transcript-line" + (role === "system" ? " system" : "");
+            line.innerHTML = `<span class="role ${role}">${role}</span><span class="text">${escapeHtml(text)}</span>`;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleCall() {
+            if (isCallActive) {
+                stopCall();
+            } else {
+                startCall();
+            }
+        }
+
+        async function startCall() {
+            const publicKey = document.getElementById("vapiKey").value.trim();
+            const assistantId = document.getElementById("assistantId").value.trim();
+
+            if (!publicKey) {
+                addTranscriptLine("system", "Error: Vapi Public Key is required.");
+                return;
+            }
+            if (!assistantId) {
+                addTranscriptLine("system", "Error: Assistant ID is required.");
+                return;
+            }
+
+            // Initialize Vapi
+            if (typeof window.Vapi === "undefined") {
+                addTranscriptLine("system", "Error: Vapi SDK not loaded. Check browser console.");
+                setStatus("error", "SDK not loaded");
+                return;
+            }
+
+            // Fetch the page-specific prompt and opening line
+            let personaData = null;
+            try {
+                const resp = await fetch(`/api/persona/${currentPersona}`);
+                personaData = await resp.json();
+            } catch (e) {
+                addTranscriptLine("system", "Warning: could not load page context");
+            }
+
+            vapi = new window.Vapi(publicKey);
+            addTranscriptLine("system", "Vapi SDK initialized.");
+
+            // Event handlers
+            vapi.on("call-start", () => {
+                isCallActive = true;
+                setStatus("connected", "Call connected — listening...");
+                document.getElementById("callBtn").textContent = "END CALL";
+                document.getElementById("callBtn").classList.add("active");
+                addTranscriptLine("system", "Call started. Speak now.");
+            });
+
+            vapi.on("call-end", () => {
+                isCallActive = false;
+                setStatus("", "Call ended");
+                document.getElementById("callBtn").textContent = "START CALL";
+                document.getElementById("callBtn").classList.remove("active");
+                addTranscriptLine("system", "Call ended.");
+            });
+
+            vapi.on("speech-start", () => {
+                setStatus("speaking", "SPARC is speaking...");
+            });
+
+            vapi.on("speech-end", () => {
+                if (isCallActive) {
+                    setStatus("connected", "Listening...");
+                }
+            });
+
+            vapi.on("message", (msg) => {
+                if (msg.type === "transcript") {
+                    if (msg.transcriptType === "final") {
+                        addTranscriptLine(msg.role, msg.transcript);
+                    }
+                }
+            });
+
+            vapi.on("error", (err) => {
+                setStatus("error", "Error: " + (err.message || JSON.stringify(err)));
+                addTranscriptLine("system", "Error: " + (err.message || JSON.stringify(err)));
+            });
+
+            // Start the call with page-specific prompt override + metadata for RAG tool
+            setStatus("", "Connecting...");
+            addTranscriptLine("system", `Starting call as ${currentPersona} (${currentRoute})...`);
+
+            const overrides = {
+                metadata: {
+                    pageRoute: currentRoute,
+                    persona: currentPersona,
+                },
+            };
+            if (personaData) {
+                overrides.firstMessage = personaData.firstMessage;
+                overrides.model = {
+                    provider: "openai",
+                    model: "gpt-4o",
+                    messages: [{
+                        role: "system",
+                        content: personaData.systemPrompt,
+                    }],
+                };
+            }
+
+            vapi.start(assistantId, overrides).catch((err) => {
+                setStatus("error", "Call failed");
+                addTranscriptLine("system", "Start error: " + (err.message || JSON.stringify(err)));
+            });
+        }
+
+        function stopCall() {
+            if (vapi) {
+                vapi.stop();
+                vapi = null;
+            }
+        }
+    </script>
+</body>
+</html>
